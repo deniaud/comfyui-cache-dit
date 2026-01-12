@@ -1,199 +1,207 @@
-# ComfyUI CacheDit 插件
+Here is the English translation, keeping the original Markdown formatting and structure intact.
 
-这是一个为 **ComfyUI** 提供扩散模型推理加速的强大插件，**完全兼容标准 CacheDiT API**，同时提供丰富的 ComfyUI 节点支持。
+***
 
-🎉 **新版本特性**：
-- ✅ **完全兼容标准 CacheDiT API** - 支持 `cache_dit.enable_cache()` 等标准接口
-- ✅ **多种缓存策略** - 固定、动态、自适应三种策略可选
-- ✅ **灵活配置** - 支持跳步间隔、预热步数、噪声缩放等参数调整
-- ✅ **详细统计** - 提供多层级的性能统计和监控
-- ✅ **向后兼容** - 保持所有原有功能不变
+# ComfyUI CacheDit Plugin
 
----
+This is a powerful plugin providing diffusion model inference acceleration for **ComfyUI**, **fully compatible with the standard CacheDiT API**, while offering rich ComfyUI node support.
 
-## ✨ 特性
+🎉 **New Version Features**:
+- ✅ **Fully Compatible with Standard CacheDiT API** - Supports standard interfaces like `cache_dit.enable_cache()`
+- ✅ **Multiple Caching Strategies** - Choose from Fixed, Dynamic, and Adaptive strategies
+- ✅ **Flexible Configuration** - Supports adjustment of skip intervals, warmup steps, noise scaling, and other parameters
+- ✅ **Detailed Statistics** - Provides multi-level performance statistics and monitoring
+- ✅ **Backward Compatibility** - Maintains all original functionality
 
-### 核心功能
-- **简单直接**：开箱即用，无需额外配置
-- **加速明显**：在 FLUX 等模型上能获得接近 2x 的推理提速
-- **即插即用**：和普通节点一样放到工作流中使用
-- **调试方便**：带有基础的性能统计信息
+***
 
-### 新增功能
-- **标准 API 兼容**：支持原版 CacheDiT 的所有 API 调用
-- **多种缓存策略**：固定跳步、动态跳步、自适应策略
-- **高级配置**：可配置的跳步间隔、预热步数、噪声缩放
-- **多模型支持**：同时管理多个模型的缓存状态
-- **详细监控**：模型级别的统计信息和性能分析
+## ✨ Features
 
----
+### Core Functions
+- **Simple and Direct**: Out-of-the-box, no extra configuration required
+- **Significant Acceleration**: Achieves nearly 2x inference speedup on models like FLUX
+- **Plug and Play**: Use it in workflows just like a standard node
+- **Easy Debugging**: Includes basic performance statistical information
 
-## 📦 安装
+### New Functions
+- **Standard API Compatibility**: Supports all API calls of the original CacheDiT
+- **Multiple Caching Strategies**: Fixed skipping, dynamic skipping, adaptive strategy
+- **Advanced Configuration**: Configurable skip intervals, warmup steps, noise scaling
+- **Multi-Model Support**: Manage cache states for multiple models simultaneously
+- **Detailed Monitoring**: Model-level statistics and performance analysis
 
-1. 把插件文件夹放到 ComfyUI 的 `custom_nodes` 目录下  
-2. 重启 ComfyUI 即可
+***
 
----
+## 📦 Installation
 
-## 🔧 使用方法
+1. Place the plugin folder into the ComfyUI `custom_nodes` directory
+2. Restart ComfyUI
 
-### 方法一：标准 CacheDiT API （推荐）
+***
 
-**完全兼容原版 CacheDiT API**，可以直接替换现有代码：
+## 🔧 Usage
+
+### Method 1: Standard CacheDiT API (Recommended)
+
+**Fully compatible with the original CacheDiT API**, you can directly replace existing code:
 
 ```python
-# 导入 CacheDiT API
+# Import CacheDiT API
 import cache_dit
 
-# 基础用法
+# Basic Usage
 cache_dit.enable_cache(model)
 
-# 高级用法
+# Advanced Usage
 cache_dit.enable_cache(model, 
-                      skip_interval=3,      # 每3步跳过1步
-                      warmup_steps=5,       # 前5步预热
-                      strategy='adaptive',  # 自适应策略
-                      noise_scale=0.002)    # 噪声缩放
+                      skip_interval=3,      # Skip 1 step every 3 steps
+                      warmup_steps=5,       # Warmup for the first 5 steps
+                      strategy='adaptive',  # Adaptive strategy
+                      noise_scale=0.002)    # Noise scaling
 
-# 获取统计信息
+# Get Statistics
 stats = cache_dit.summary(model)
 print(stats)
 
-# 禁用缓存
+# Disable Cache
 cache_dit.disable_cache(model)
 ```
 
-### 方法二：ComfyUI 节点
+### Method 2: ComfyUI Nodes
 
-#### 基础节点（向后兼容）
-1. 在工作流中添加 **`CacheDit 模型加速`** 节点  
-2. 把模型连接到该节点  
-3. 使用加速后的模型进行推理  
+#### Basic Node (Backward Compatible)
+1. Add the **`CacheDit Model Acceleration`** node to your workflow
+2. Connect the model to this node
+3. Use the accelerated model for inference
 
-#### 高级节点（新功能）
-1. **`CacheDit 高级配置`** - 支持多种策略和参数调整
-2. **`CacheDit 缓存控制`** - 动态启用/禁用缓存
-3. **`CacheDit 详细统计`** - 查看详细性能分析
+#### Advanced Nodes (New Features)
+1. **`CacheDit Advanced Config`** - Supports multiple strategies and parameter adjustments
+2. **`CacheDit Cache Control`** - Dynamically enable/disable cache
+3. **`CacheDit Detailed Stats`** - View detailed performance analysis
 
-推荐工作流：
+Recommended Workflow:
 ```
-模型加载 → CacheDit 高级配置 → 推理节点 → CacheDit 详细统计
+Model Loader → CacheDit Advanced Config → Inference Node → CacheDit Detailed Stats
 ```
 
----
+***
 
-## 📊 缓存策略
+## 📊 Caching Strategies
 
-### 1. 固定策略 (Fixed)
-- 按固定间隔跳过计算
-- 适合稳定的推理场景
-- 参数：`skip_interval`（跳步间隔）
+### 1. Fixed Strategy (Fixed)
+- Skips calculation at fixed intervals
+- Suitable for stable inference scenarios
+- Parameter: `skip_interval`
 
-### 2. 动态策略 (Dynamic)  
-- 随着步数增加，跳步频率提高
-- 适合长序列推理
-- 自动优化性能
+### 2. Dynamic Strategy (Dynamic)
+- Skip frequency increases as steps increase
+- Suitable for long sequence inference
+- Automatically optimizes performance
 
-### 3. 自适应策略 (Adaptive)
-- 根据性能监控自动调整
-- 智能优化缓存策略
-- 最佳的性能表现
+### 3. Adaptive Strategy (Adaptive)
+- Automatically adjusts based on performance monitoring
+- Smartly optimizes caching strategy
+- Best performance
 
----
+***
 
-## ⚡ 性能表现
+## ⚡ Performance
 
-- **FLUX 模型**：加速可达约 2x  
-- **缓存命中率**：理论上约 50%（固定策略）
-- **质量影响**：肉眼几乎看不出差别  
-- **多模型支持**：同时加速多个模型
+- **FLUX Model**: Acceleration up to approx. 2x
+- **Cache Hit Rate**: Theoretically approx. 50% (Fixed strategy)
+- **Quality Impact**: Almost indistinguishable to the naked eye
+- **Multi-Model Support**: Accelerates multiple models simultaneously
 
----
+***
 
-## 🔧 高级配置
+## 🔧 Advanced Configuration
 
-### API 方式
+### API Method
 ```python
 import cache_dit
 
-# 设置全局配置
+# Set Global Configuration
 cache_dit.set_global_config(
     default_skip_interval=3,
     default_strategy='adaptive',
     global_debug=True
 )
 
-# 获取全局统计
+# Get Global Stats
 stats = cache_dit.get_global_stats()
-print(f"总缓存命中: {stats['total_cache_hits']}")
+print(f"Total Cache Hits: {stats['total_cache_hits']}")
 
-# 重置统计信息
+# Reset Statistics
 cache_dit.reset_cache_stats()
 ```
 
-### 节点方式
-使用 **`CacheDit 高级配置`** 节点：
-- 策略选择：fixed/dynamic/adaptive
-- 跳步间隔：1-10
-- 预热步数：0-20  
-- 噪声缩放：0.0-0.1
-- 调试模式：开启/关闭
+### Node Method
+Using the **`CacheDit Advanced Config`** node:
+- Strategy Selection: fixed/dynamic/adaptive
+- Skip Interval: 1-10
+- Warmup Steps: 0-20
+- Noise Scaling: 0.0-0.1
+- Debug Mode: On/Off
 
----
+***
 
-## 📊 工作原理
+## 📊 How It Works
 
-### 基础原理
-- 前几步正常运行（预热阶段）
-- 之后根据策略跳过部分计算，直接复用之前的结果
-- 在复用的结果上加入轻微噪声，避免图像出现明显伪影  
+### Basic Principle
+- Runs normally for the first few steps (Warmup phase)
+- Afterwards, it skips parts of the calculation based on the strategy, directly reusing previous results
+- Adds slight noise to the reused results to avoid obvious artifacts in the image
 
-这种做法利用了扩散模型相邻步之间结果相似的特点，因此可以节省大量计算。
+This approach leverages the characteristic that adjacent steps in diffusion models have similar results, thus saving significant computation.
 
-### 策略详解
-1. **固定策略**：每 N 步跳过 1 步，简单可靠
-2. **动态策略**：随着步数增加动态调整跳步频率  
-3. **自适应策略**：根据性能监控智能优化跳步决策
+### Strategy Details
+1. **Fixed Strategy**: Skips 1 step every N steps, simple and reliable
+2. **Dynamic Strategy**: Dynamically adjusts skip frequency as step count increases
+3. **Adaptive Strategy**: Smartly optimizes skip decisions based on performance monitoring
 
----
+***
 
-## 🛠 故障排查
+## 🛠 Troubleshooting
 
-如果节点没有生效，可以尝试：  
-1. 查看控制台输出的调试日志  
-2. 确认模型类型是否兼容（目前主要支持 transformer 架构）  
-3. 检查统计信息，确认缓存是否真的被使用
-4. 使用调试模式：`cache_dit.enable_cache(model, debug=True)`
-5. 查看详细统计：使用 `CacheDit 详细统计` 节点
+If the node is not taking effect, try the following:
+1. Check the debug logs output in the console
+2. Confirm if the model type is compatible (currently mainly supports Transformer architectures)
+3. Check statistics to confirm if the cache is actually being used
+4. Use debug mode: `cache_dit.enable_cache(model, debug=True)`
+5. View detailed stats: Use the `CacheDit Detailed Stats` node
 
-### 常见问题
-- **缓存效果不佳**：调整跳步间隔和预热步数
-- **图像质量下降**：减小噪声缩放因子或增加预热步数
-- **找不到 transformer**：检查模型类型兼容性
+### Common Issues
+- **Poor Caching Effect**: Adjust skip interval and warmup steps
+- **Image Quality Degradation**: Reduce noise scaling factor or increase warmup steps
+- **Transformer Not Found**: Check model type compatibility
 
----
+***
 
-## 📚 更多资源
+## 📚 More Resources
 
-- **使用示例**：查看 `examples.py` 文件了解详细用法
-- **API 文档**：所有函数都有详细的文档字符串
-- **调试指南**：启用 debug 模式获取详细日志
-- **性能测试**：使用统计功能监控加速效果
+- **Usage Examples**: Check `examples.py` for detailed usage
+- **API Documentation**: All functions have detailed docstrings
+- **Debug Guide**: Enable debug mode to get detailed logs
+- **Performance Testing**: Use statistical functions to monitor acceleration effects
 
----
+***
 
-## 🚧 开发计划
+## 🚧 Roadmap
 
-- [x] ✅ 实现标准 CacheDiT API 兼容性
-- [x] ✅ 支持多种缓存策略  
-- [x] ✅ 添加详细统计和监控
-- [x] ✅ 创建高级配置节点
-- [ ] 🔄 添加更多自适应策略算法
-- [ ] 🔄 支持更多模型架构
-- [ ] 🔄 性能基准测试套件
+- [x] ✅ Implement Standard CacheDiT API Compatibility
+- [x] ✅ Support Multiple Caching Strategies
+- [x] ✅ Add Detailed Statistics and Monitoring
+- [x] ✅ Create Advanced Configuration Node
+- [ ] 🔄 Add More Adaptive Strategy Algorithms
+- [ ] 🔄 Support More Model Architectures
+- [ ] 🔄 Performance Benchmark Suite
 
----
+***
 
 ## 📄 License
 
-开源项目，欢迎 issue 和 PR。
+Open source project, issues and PRs welcome.
+
+***
+
+Would you like me to create a Python script example demonstrating how to integrate this `cache_dit` API into a standard Diffusers pipeline?
