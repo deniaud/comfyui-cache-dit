@@ -1,21 +1,25 @@
 """
-ComfyUI 缓存加速引擎
+ComfyUI Cache Acceleration Engine
 
-这个模块实现了灵活而高效的缓存算法，通过直接替换 transformer 的 forward 方法
-来实现推理加速。经过实测，这种方法在 FLUX 等模型上能实现 2x+ 的加速效果。
 
-核心逻辑：
-1. 找到 ComfyUI 模型中的 transformer 组件
-2. 替换其 forward 方法为缓存版本
-3. 支持多种缓存策略（固定跳步、动态跳步、自适应等）
-4. 跳过时返回上次结果 + 微量噪声（防止伪影）
+This module implements a flexible and efficient caching algorithm to accelerate inference by directly replacing the transformer's forward method.
+In real-world tests, this approach can achieve \(2x+\) speedups on models such as FLUX.
 
-新增特性：
-- 可配置的缓存策略
-- 动态参数调整
-- 详细的性能统计
-- 标准 CacheDiT API 兼容性
+
+Core logic:
+1. Locate the transformer component in a ComfyUI model
+2. Replace its forward method with a cached version
+3. Support multiple caching strategies (fixed step skipping, dynamic step skipping, adaptive, etc.)
+4. When skipping, return the previous result + a tiny amount of noise (to prevent artifacts)
+
+
+New features:
+- Configurable caching strategies
+- Dynamic parameter adjustment
+- Detailed performance statistics
+- Standard CacheDiT API compatibility
 """
+
 
 import torch
 import time
@@ -25,54 +29,56 @@ from dataclasses import dataclass
 import weakref
 
 
+
 @dataclass
 class CacheStrategy:
     """
-    缓存策略配置类
+    Cache strategy configuration class
     
-    定义缓存行为的各种参数，支持不同的加速策略。
+    Defines various parameters for caching behavior and supports different acceleration strategies.
     """
-    skip_interval: int = 2          # 跳步间隔（每N步跳过一次）
-    warmup_steps: int = 3           # 预热步数（前N步总是计算）
-    strategy_type: str = 'fixed'    # 策略类型：'fixed', 'dynamic', 'adaptive'
-    noise_scale: float = 0.001      # 噪声缩放因子
-    enable_stats: bool = True       # 是否启用统计
-    debug: bool = False             # 调试模式
+    skip_interval: int = 2          # Step-skipping interval (skip once every N steps)
+    warmup_steps: int = 3           # Warmup steps (always compute for the first N steps)
+    strategy_type: str = 'fixed'    # Strategy type: 'fixed', 'dynamic', 'adaptive'
+    noise_scale: float = 0.001      # Noise scaling factor
+    enable_stats: bool = True       # Whether to enable statistics
+    debug: bool = False             # Debug mode
     
     def should_skip(self, call_count: int) -> bool:
         """
-        根据策略决定是否跳过当前调用
+        Decide whether to skip the current call based on the strategy
         
         Args:
-            call_count: 当前调用次数
+            call_count: Current call count
             
         Returns:
-            bool: 是否应该跳过计算
+            bool: Whether computation should be skipped
         """
         if call_count <= self.warmup_steps:
             return False
             
         if self.strategy_type == 'fixed':
-            # 固定间隔跳步
+            # Fixed-interval skipping
             return call_count % self.skip_interval == 0
         elif self.strategy_type == 'dynamic':
-            # 动态跳步：随着步数增加，跳步频率提高
+            # Dynamic skipping: as steps increase, skipping becomes more frequent
             interval = max(1, self.skip_interval - (call_count - self.warmup_steps) // 10)
             return call_count % interval == 0
         elif self.strategy_type == 'adaptive':
-            # 自适应跳步：根据性能自动调整（简化版）
-            # 这里可以根据实际的性能监控来动态调整
+            # Adaptive skipping: automatically adjust based on performance (simplified)
+            # This can be adjusted dynamically based on real performance monitoring
             return call_count % self.skip_interval == 0
         else:
             return False
 
 
+
 @dataclass 
 class ModelCacheState:
     """
-    单个模型的缓存状态
+    Cache state for a single model
     
-    跟踪每个模型的缓存相关信息和统计数据。
+    Tracks cache-related information and statistics for each model.
     """
     model_id: str
     is_enabled: bool = True
@@ -88,38 +94,39 @@ class ModelCacheState:
             self.compute_times = []
 
 
+
 class EnhancedCache:
     """
-    增强版缓存实现 - 支持多种策略和API兼容性
+    Enhanced cache implementation - supports multiple strategies and API compatibility
     
-    核心思想：在 diffusion 模型的连续推理步骤中，相邻步骤的输出往往很相似，
-    可以通过跳过部分计算并重用之前的结果来实现加速。
+    Core idea: during consecutive inference steps in diffusion models, outputs of neighboring steps are often very similar.
+    You can speed things up by skipping some computations and reusing previous results.
     
-    新特性：
-    - 支持多种缓存策略
-    - 可配置的参数
-    - 详细的统计信息
-    - 模型级别的状态管理
-    - 标准 CacheDiT API 兼容
+    New features:
+    - Support multiple cache strategies
+    - Configurable parameters
+    - Detailed statistics
+    - Model-level state management
+    - Standard CacheDiT API compatibility
     """
     
     def __init__(self):
-        """初始化增强缓存系统"""
-        self.model_states: Dict[str, ModelCacheState] = {}  # 每个模型的状态
-        self.global_config: Dict[str, Any] = {}              # 全局配置
-        self.model_refs = weakref.WeakKeyDictionary()        # 弱引用映射
+        """Initialize the enhanced caching system"""
+        self.model_states: Dict[str, ModelCacheState] = {}  # Per-model state
+        self.global_config: Dict[str, Any] = {}              # Global configuration
+        self.model_refs = weakref.WeakKeyDictionary()        # Weak reference mapping
         
-        # 向后兼容的全局统计
+        # Backward-compatible global stats
         self.call_count = 0
         self.skip_count = 0
         self.compute_times = []
         
     def _get_model_id(self, model) -> str:
-        """获取模型的唯一标识符"""
+        """Get a unique identifier for the model"""
         return f"{type(model).__name__}_{id(model)}"
     
     def _get_or_create_state(self, model, strategy: Optional[CacheStrategy] = None) -> ModelCacheState:
-        """获取或创建模型的缓存状态"""
+        """Get or create the model cache state"""
         model_id = self._get_model_id(model)
         
         if model_id not in self.model_states:
@@ -133,11 +140,11 @@ class EnhancedCache:
     
     def enable_cache(self, model, strategy: Optional[CacheStrategy] = None):
         """
-        为模型启用缓存 (新的 API 兼容接口)
+        Enable caching for a model (new API-compatible interface)
         
         Args:
-            model: 模型对象
-            strategy: 缓存策略配置
+            model: Model object
+            strategy: Cache strategy configuration
         """
         state = self._get_or_create_state(model, strategy)
         state.is_enabled = True
@@ -146,10 +153,10 @@ class EnhancedCache:
     
     def disable_cache(self, model):
         """
-        为模型禁用缓存 (新的 API 兼容接口)
+        Disable caching for a model (new API-compatible interface)
         
         Args:
-            model: 模型对象
+            model: Model object
         """
         model_id = self._get_model_id(model)
         
@@ -157,174 +164,174 @@ class EnhancedCache:
             state = self.model_states[model_id]
             state.is_enabled = False
             
-            # 恢复原始 forward 方法
+            # Restore the original forward method
             transformer = self._find_transformer(model)
             if transformer and state.original_forward:
                 transformer.forward = state.original_forward
                 if hasattr(transformer, '_original_forward'):
                     delattr(transformer, '_original_forward')
-                print("✓ 已恢复原始 forward 方法")
+                print("✓ Restored original forward method")
         
     def patch_model(self, model, state: Optional[ModelCacheState] = None):
         """
-        为 ComfyUI 模型应用缓存补丁 (增强版)
+        Apply a caching patch to a ComfyUI model (enhanced)
         
-        这个函数会：
-        1. 在复杂的 ComfyUI 模型结构中找到 transformer 组件
-        2. 保存原始的 forward 方法
-        3. 替换为缓存版本的 forward 方法
+        This function will:
+        1. Find the transformer component within complex ComfyUI model structures
+        2. Save the original forward method
+        3. Replace it with a cached forward method
         
         Args:
-            model: ComfyUI 模型对象（通常是 ModelPatcher 类型）
-            state: 模型缓存状态（可选）
+            model: ComfyUI model object (usually ModelPatcher)
+            state: Model cache state (optional)
             
         Returns:
-            应用了缓存的模型对象
+            The model object with caching applied
         """
         if state is None:
             state = self._get_or_create_state(model)
             
-        print("=== ComfyUI 缓存加速 (增强版) ===")
-        print(f"   模型ID: {state.model_id}")
-        print(f"   策略: {state.strategy.strategy_type}")
-        print(f"   跳步间隔: {state.strategy.skip_interval}")
-        print(f"   预热步数: {state.strategy.warmup_steps}")
+        print("=== ComfyUI Cache Acceleration (Enhanced) ===")
+        print(f"   Model ID: {state.model_id}")
+        print(f"   Strategy: {state.strategy.strategy_type}")
+        print(f"   Skip interval: {state.strategy.skip_interval}")
+        print(f"   Warmup steps: {state.strategy.warmup_steps}")
         
-        # 第一步：在 ComfyUI 模型结构中找到 transformer
+        # Step 1: find the transformer in the ComfyUI model structure
         transformer = self._find_transformer(model)
         if transformer is None:
-            print("❌ 未能找到 transformer 组件")
+            print("❌ Failed to find transformer component")
             return model
             
-        print(f"✓ 找到 transformer: {type(transformer)}")
+        print(f"✓ Found transformer: {type(transformer)}")
         
-        # 检查是否已经应用过缓存（避免重复修改）
+        # Check whether caching was already applied (avoid duplicate patching)
         if hasattr(transformer, '_original_forward'):
-            print("⚠ 模型已经应用过缓存")
+            print("⚠ Caching already applied to this model")
             return model
             
-        # 第二步：保存原始 forward 方法
+        # Step 2: save the original forward method
         state.original_forward = transformer.forward
         transformer._original_forward = transformer.forward
         
-        # 第三步：创建缓存版本的 forward 方法
+        # Step 3: create the cached forward method
         def cached_forward(*args, **kwargs):
             """
-            缓存版本的 forward 方法 (增强版)
+            Cached version of the forward method (enhanced)
             
-            支持多种缓存策略和详细的统计信息收集。
+            Supports multiple cache strategies and detailed statistics collection.
             """
             if not state.is_enabled:
-                # 缓存被禁用，直接调用原始方法
+                # Cache disabled, call the original method directly
                 return state.original_forward(*args, **kwargs)
                 
             state.call_count += 1
-            self.call_count += 1  # 向后兼容
+            self.call_count += 1  # Backward compatibility
             call_id = state.call_count
             
             if state.strategy.debug:
-                print(f"\n🔄 Forward 调用 #{call_id} (模型: {state.model_id})")
-                print(f"   参数数量: {len(args)}")
-                print(f"   关键字参数: {list(kwargs.keys())}")
+                print(f"\n🔄 Forward call #{call_id} (model: {state.model_id})")
+                print(f"   Arg count: {len(args)}")
+                print(f"   Kwargs: {list(kwargs.keys())}")
                 
-                # 记录张量信息（调试模式）
+                # Log tensor info (debug mode)
                 for i, arg in enumerate(args):
                     if isinstance(arg, torch.Tensor):
-                        print(f"   参数[{i}] 张量: {arg.shape}, 设备: {arg.device}, 类型: {arg.dtype}")
+                        print(f"   Arg[{i}] tensor: {arg.shape}, device: {arg.device}, dtype: {arg.dtype}")
                 
-                # 检查 transformer_options（ComfyUI 特有的参数传递方式）
+                # Check transformer_options (ComfyUI-specific parameter passing)
                 transformer_options = kwargs.get('transformer_options', {})
-                print(f"   Transformer 选项: {list(transformer_options.keys())}")
+                print(f"   Transformer options: {list(transformer_options.keys())}")
             
-            # 核心缓存逻辑：根据策略决定是否跳过计算
+            # Core caching logic: decide whether to skip based on the strategy
             should_skip = state.strategy.should_skip(call_id)
             
             if should_skip:
                 state.skip_count += 1
-                self.skip_count += 1  # 向后兼容
+                self.skip_count += 1  # Backward compatibility
                 
                 if state.strategy.debug:
-                    print(f"   🚀 尝试跳过计算 #{call_id}")
+                    print(f"   🚀 Attempting to skip computation #{call_id}")
                 
-                # 使用缓存结果（如果有的话）
+                # Use cached result (if available)
                 if state.last_result is not None:
                     if state.strategy.debug:
-                        print(f"   ✓ 使用缓存结果（来自之前的调用）")
+                        print("   ✓ Using cached result (from a previous call)")
                     
-                    # 为缓存结果添加微量噪声防止图像伪影
+                    # Add a tiny amount of noise to prevent image artifacts
                     if isinstance(state.last_result, torch.Tensor):
                         noise = torch.randn_like(state.last_result) * state.strategy.noise_scale
                         cached_result = state.last_result + noise
                         
                         if state.strategy.debug:
-                            print(f"   📊 缓存命中 #{state.skip_count}")
+                            print(f"   📊 Cache hit #{state.skip_count}")
                         return cached_result
             
-            # 正常计算
+            # Normal computation
             if state.strategy.debug:
-                print(f"   🖥 正常计算调用 #{call_id}")
+                print(f"   🖥 Normal compute call #{call_id}")
             
             start_time = time.time()
             
-            # 调用原始的 forward 方法进行实际计算
+            # Call the original forward method to do the actual computation
             result = state.original_forward(*args, **kwargs)
             
             compute_time = time.time() - start_time
             
             if state.strategy.enable_stats:
                 state.compute_times.append(compute_time)
-                self.compute_times.append(compute_time)  # 向后兼容
+                self.compute_times.append(compute_time)  # Backward compatibility
             
             if state.strategy.debug:
-                print(f"   ⏱ 计算耗时: {compute_time:.3f}s")
+                print(f"   ⏱ Compute time: {compute_time:.3f}s")
             
-            # 缓存结果供后续使用
+            # Cache the result for later reuse
             if isinstance(result, torch.Tensor):
                 state.last_result = result.clone().detach()
                 if state.strategy.debug:
-                    print(f"   💾 已缓存结果: {result.shape}")
+                    print(f"   💾 Cached result: {result.shape}")
             
             return result
         
-        # 第四步：替换 forward 方法
+        # Step 4: replace the forward method
         transformer.forward = cached_forward
-        print("✓ Forward 方法已替换为增强缓存版本")
+        print("✓ Forward method replaced with enhanced cached version")
         
         return model
         
     def _find_transformer(self, model):
         """
-        在 ComfyUI 模型结构中查找 transformer 组件
+        Find the transformer component within a ComfyUI model structure
         
-        ComfyUI 的模型结构比较复杂，不同类型的模型有不同的嵌套结构：
-        - model.model.diffusion_model  # 最常见
-        - model.diffusion_model        # 次常见  
-        - model.transformer            # 直接引用
+        ComfyUI models can have complex structures, and different model types have different nesting patterns:
+        - model.model.diffusion_model  # most common
+        - model.diffusion_model        # second most common
+        - model.transformer            # direct reference
         
         Args:
-            model: ComfyUI 模型对象
+            model: ComfyUI model object
             
         Returns:
-            找到的 transformer 组件，失败返回 None
+            The found transformer component, or None on failure
         """
         
-        print("🔍 搜索 transformer 组件...")
+        print("🔍 Searching for transformer component...")
         
-        # 按优先级尝试不同的访问路径
+        # Try different access paths by priority
         if hasattr(model, 'model') and hasattr(model.model, 'diffusion_model'):
-            print("   找到路径: model.model.diffusion_model")
+            print("   Found path: model.model.diffusion_model")
             return model.model.diffusion_model
         elif hasattr(model, 'diffusion_model'):
-            print("   找到路径: model.diffusion_model")
+            print("   Found path: model.diffusion_model")
             return model.diffusion_model
         elif hasattr(model, 'transformer'):
-            print("   找到路径: model.transformer")
+            print("   Found path: model.transformer")
             return model.transformer
         else:
-            print("   ❌ 标准路径未找到 transformer")
+            print("   ❌ Transformer not found via standard paths")
             
-            # 调试信息：列出可用属性
-            print("   可用属性:")
+            # Debug info: list available attributes
+            print("   Available attributes:")
             for attr in dir(model):
                 if not attr.startswith('_'):
                     try:
@@ -338,72 +345,73 @@ class EnhancedCache:
     
     def get_stats(self) -> str:
         """
-        获取缓存统计信息 (向后兼容)
+        Get cache statistics (backward compatibility)
         
         Returns:
-            格式化的统计信息字符串
+            Formatted statistics string
         """
         total_calls = self.call_count
         cache_hits = self.skip_count
         avg_compute_time = sum(self.compute_times) / max(len(self.compute_times), 1)
         
-        stats = f"""缓存统计信息:
-总 Forward 调用: {total_calls}
-缓存命中: {cache_hits}
-缓存命中率: {cache_hits/max(total_calls,1)*100:.1f}%
-平均计算时间: {avg_compute_time:.3f}秒
-预期加速比: {2.0 if cache_hits > 0 else 1.0:.1f}x"""
+        stats = f"""Cache statistics:
+Total forward calls: {total_calls}
+Cache hits: {cache_hits}
+Cache hit rate: {cache_hits/max(total_calls,1)*100:.1f}%
+Average compute time: {avg_compute_time:.3f} seconds
+Expected speedup: {2.0 if cache_hits > 0 else 1.0:.1f}x"""
         
         print(f"\n📊 {stats}")
         return stats
     
     def get_detailed_stats(self) -> str:
         """
-        获取详细缓存统计信息 (新API)
+        Get detailed cache statistics (new API)
         
         Returns:
-            格式化的详细统计信息字符串
+            Formatted detailed statistics string
         """
-        # 全局统计
+        # Global stats
         total_calls = self.call_count
         cache_hits = self.skip_count
         avg_compute_time = sum(self.compute_times) / max(len(self.compute_times), 1)
         
-        # 按模型统计
+        # Per-model stats
         model_stats = []
         for model_id, state in self.model_states.items():
             if state.call_count > 0:
                 model_avg_time = sum(state.compute_times) / max(len(state.compute_times), 1)
                 hit_rate = state.skip_count / max(state.call_count, 1) * 100
                 model_stats.append(f"""
-  模型 {model_id[:20]}...:
-    调用次数: {state.call_count}
-    缓存命中: {state.skip_count}
-    命中率: {hit_rate:.1f}%
-    平均耗时: {model_avg_time:.3f}s
-    策略: {state.strategy.strategy_type}
-    状态: {'启用' if state.is_enabled else '禁用'}""")
+  Model {model_id[:20]}...:
+    Calls: {state.call_count}
+    Cache hits: {state.skip_count}
+    Hit rate: {hit_rate:.1f}%
+    Avg time: {model_avg_time:.3f}s
+    Strategy: {state.strategy.strategy_type}
+    Status: {'Enabled' if state.is_enabled else 'Disabled'}""")
         
-        detailed_stats = f"""=== CacheDiT 详细统计 ===
-全局统计:
-  总 Forward 调用: {total_calls}
-  总缓存命中: {cache_hits}
-  全局命中率: {cache_hits/max(total_calls,1)*100:.1f}%
-  平均计算时间: {avg_compute_time:.3f}秒
-  预期加速比: {2.0 if cache_hits > 0 else 1.0:.1f}x
-  活跃模型数: {len(self.model_states)}
+        detailed_stats = f"""=== CacheDiT Detailed Statistics ===
+Global stats:
+  Total forward calls: {total_calls}
+  Total cache hits: {cache_hits}
+  Global hit rate: {cache_hits/max(total_calls,1)*100:.1f}%
+  Average compute time: {avg_compute_time:.3f} seconds
+  Expected speedup: {2.0 if cache_hits > 0 else 1.0:.1f}x
+  Active model count: {len(self.model_states)}
 
-模型详情:{''.join(model_stats) if model_stats else '  暂无活跃模型'}"""
+
+Model details:{''.join(model_stats) if model_stats else '  No active models'}"""
         
         print(f"\n📊 {detailed_stats}")
         return detailed_stats
     
     def get_global_stats(self) -> Dict[str, Any]:
         """
-        获取全局统计信息字典 (新API)
+        Get global statistics dictionary (new API)
         
         Returns:
-            包含详细统计信息的字典
+            Dictionary containing detailed statistics
         """
         return {
             'total_calls': self.call_count,
@@ -427,16 +435,16 @@ class EnhancedCache:
     
     def set_global_config(self, config: Dict[str, Any]):
         """
-        设置全局配置 (新API)
+        Set global configuration (new API)
         
         Args:
-            config: 配置字典
+            config: Configuration dictionary
         """
         self.global_config.update(config)
     
     def reset_stats(self):
         """
-        重置所有统计信息 (新API)
+        Reset all statistics (new API)
         """
         self.call_count = 0
         self.skip_count = 0
@@ -447,41 +455,46 @@ class EnhancedCache:
             state.skip_count = 0
             state.compute_times = []
     
-    # === 向后兼容的简单接口 ===
+    # === Backward-compatible simple interface ===
     def patch_model_simple(self, model):
-        """向后兼容的简单补丁接口"""
+        """Backward-compatible simple patch interface"""
         return self.patch_model(model)
 
 
-# 全局缓存实例 - 使用增强版缓存
-# 使用单例模式确保整个 ComfyUI 会话中的一致性
+
+# Global cache instance - uses the enhanced cache
+# Singleton pattern ensures consistency across the entire ComfyUI session
 global_cache = EnhancedCache()
 
 
-# === 向后兼容的简单接口 ===
+
+# === Backward-compatible simple interface ===
+
 
 def patch_model_simple(model):
     """
-    简单的模型补丁函数（保持与调试版本的兼容性）
+    Simple model patch function (kept compatible with the debug version)
     
     Args:
-        model: ComfyUI 模型对象
+        model: ComfyUI model object
         
     Returns:
-        应用了缓存的模型
+        The model with caching applied
     """
     return global_cache.patch_model(model)
 
 
+
 def get_simple_stats():
     """
-    获取简单统计信息（保持与调试版本的兼容性）
+    Get simple statistics (kept compatible with the debug version)
     
     Returns:
-        统计信息字符串
+        Statistics string
     """
     return global_cache.get_stats()
 
 
-# === 兼容性别名 ===
-SimpleCache = EnhancedCache  # 向后兼容
+
+# === Compatibility alias ===
+SimpleCache = EnhancedCache  # Backward compatibility

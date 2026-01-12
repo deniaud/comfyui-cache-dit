@@ -1,23 +1,27 @@
 """
-ComfyUI 缓存加速节点
+ComfyUI Cache Acceleration Nodes
 
-这个文件定义了 ComfyUI 的自定义节点，用户可以通过这些节点在工作流中应用缓存加速。
-基于增强版缓存引擎，支持多种缓存策略和配置选项。
 
-新增功能：
-- 缓存配置节点：支持多种策略和参数调整
-- 缓存控制节点：动态启用/禁用缓存
-- 增强统计节点：提供更详细的性能信息
+This file defines custom nodes for ComfyUI. Users can apply cache acceleration in workflows via these nodes.
+Based on the enhanced caching engine, it supports multiple caching strategies and configuration options.
+
+
+New features:
+- Cache configuration node: supports multiple strategies and parameter tuning
+- Cache control node: dynamically enable/disable caching
+- Enhanced statistics node: provides more detailed performance information
 """
+
 
 from .cache_engine import patch_model_simple, get_simple_stats, global_cache, CacheStrategy
 
 
+
 class CacheDitAccelerateNode:
     """
-    CacheDit 加速节点
+    CacheDit acceleration node
     
-    将缓存加速应用到 ComfyUI 模型，实现 2x+ 推理加速
+    Applies cache acceleration to a ComfyUI model to achieve \(2x+\) inference speedup
     """
     
     @classmethod
@@ -28,69 +32,75 @@ class CacheDitAccelerateNode:
             }
         }
 
+
     RETURN_TYPES = ("MODEL",)
-    RETURN_NAMES = ("加速模型",)
+    RETURN_NAMES = ("Accelerated model",)
     FUNCTION = "accelerate_model"
     CATEGORY = "CacheDit"
 
+
     def accelerate_model(self, model):
         """
-        应用缓存加速到模型
+        Apply cache acceleration to the model
         
         Args:
-            model: 输入的 ComfyUI 模型
+            model: Input ComfyUI model
             
         Returns:
-            tuple: (加速后的模型,)
+            tuple: (accelerated model,)
         """
-        print("\n🚀 应用 CacheDit 加速...")
+        print("\n🚀 Applying CacheDit acceleration...")
         
-        # 应用缓存补丁
+        # Apply the cache patch
         accelerated_model = patch_model_simple(model)
         
-        print("✓ CacheDit 加速已应用")
+        print("✓ CacheDit acceleration applied")
         return (accelerated_model,)
+
 
 
 class CacheDitStatsNode:
     """
-    CacheDit 统计节点
+    CacheDit statistics node
     
-    显示缓存统计信息，包括命中率和预期加速比
+    Displays cache statistics, including hit rate and expected speedup
     """
     
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "trigger": ("*",),  # 接受任何类型作为触发器
+                "trigger": ("*",),  # Accept any type as a trigger
             }
         }
 
+
     RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("统计信息",)
+    RETURN_NAMES = ("Statistics",)
     FUNCTION = "get_stats"
     CATEGORY = "CacheDit"
 
+
     def get_stats(self, trigger):
         """
-        获取缓存统计信息
+        Get cache statistics
         
         Args:
-            trigger: 触发器（任何值）
+            trigger: Trigger (any value)
             
         Returns:
-            tuple: (统计信息字符串,)
+            tuple: (statistics string,)
         """
         stats = get_simple_stats()
         return (stats,)
 
 
+
 class CacheDitConfigNode:
     """
-    CacheDit 配置节点
+    CacheDit configuration node
     
-    提供高级缓存配置选项，支持多种缓存策略和参数调整
+    Provides advanced cache configuration options, supporting multiple caching strategies and parameter tuning
     """
     
     @classmethod
@@ -108,35 +118,37 @@ class CacheDitConfigNode:
             }
         }
 
+
     RETURN_TYPES = ("MODEL",)
-    RETURN_NAMES = ("配置模型",)
+    RETURN_NAMES = ("Configured model",)
     FUNCTION = "configure_cache"
     CATEGORY = "CacheDit"
+
 
     def configure_cache(self, model, strategy, skip_interval, warmup_steps, 
                        noise_scale=0.001, enable_debug=False):
         """
-        配置并应用缓存加速到模型
+        Configure and apply cache acceleration to the model
         
         Args:
-            model: 输入的 ComfyUI 模型
-            strategy: 缓存策略类型
-            skip_interval: 跳步间隔
-            warmup_steps: 预热步数
-            noise_scale: 噪声缩放因子
-            enable_debug: 是否启用调试输出
+            model: Input ComfyUI model
+            strategy: Cache strategy type
+            skip_interval: Step-skipping interval
+            warmup_steps: Warmup steps
+            noise_scale: Noise scaling factor
+            enable_debug: Whether to enable debug output
             
         Returns:
-            tuple: (配置后的模型,)
+            tuple: (configured model,)
         """
-        print(f"\n🔧 配置 CacheDit 加速...")
-        print(f"   策略: {strategy}")
-        print(f"   跳步间隔: {skip_interval}")
-        print(f"   预热步数: {warmup_steps}")
-        print(f"   噪声缩放: {noise_scale}")
-        print(f"   调试模式: {enable_debug}")
+        print(f"\n🔧 Configuring CacheDit acceleration...")
+        print(f"   Strategy: {strategy}")
+        print(f"   Skip interval: {skip_interval}")
+        print(f"   Warmup steps: {warmup_steps}")
+        print(f"   Noise scale: {noise_scale}")
+        print(f"   Debug mode: {enable_debug}")
         
-        # 创建缓存策略
+        # Create cache strategy
         cache_strategy = CacheStrategy(
             skip_interval=skip_interval,
             warmup_steps=warmup_steps,
@@ -146,18 +158,19 @@ class CacheDitConfigNode:
             debug=enable_debug
         )
         
-        # 应用缓存配置
+        # Apply cache configuration
         configured_model = global_cache.enable_cache(model, cache_strategy)
         
-        print("✓ CacheDit 缓存配置已应用")
+        print("✓ CacheDit cache configuration applied")
         return (configured_model,)
+
 
 
 class CacheDitControlNode:
     """
-    CacheDit 控制节点
+    CacheDit control node
     
-    动态启用或禁用模型的缓存功能
+    Dynamically enable or disable the model's caching feature
     """
     
     @classmethod
@@ -169,69 +182,74 @@ class CacheDitControlNode:
             }
         }
 
+
     RETURN_TYPES = ("MODEL",)
-    RETURN_NAMES = ("控制模型",)
+    RETURN_NAMES = ("Controlled model",)
     FUNCTION = "control_cache"
     CATEGORY = "CacheDit"
 
+
     def control_cache(self, model, enable_cache):
         """
-        控制模型的缓存启用状态
+        Control the cache enabled state for the model
         
         Args:
-            model: 输入的 ComfyUI 模型
-            enable_cache: 是否启用缓存
+            model: Input ComfyUI model
+            enable_cache: Whether to enable cache
             
         Returns:
-            tuple: (控制后的模型,)
+            tuple: (controlled model,)
         """
-        print(f"\n🎛 控制 CacheDit 缓存: {'启用' if enable_cache else '禁用'}")
+        print(f"\n🎛 Controlling CacheDit cache: {'Enable' if enable_cache else 'Disable'}")
         
         if enable_cache:
-            # 启用缓存（使用默认策略）
+            # Enable cache (use default strategy)
             controlled_model = global_cache.enable_cache(model, CacheStrategy())
         else:
-            # 禁用缓存
+            # Disable cache
             global_cache.disable_cache(model)
             controlled_model = model
         
-        print(f"✓ CacheDit 缓存已{'启用' if enable_cache else '禁用'}")
+        print(f"✓ CacheDit cache {'enabled' if enable_cache else 'disabled'}")
         return (controlled_model,)
+
 
 
 class CacheDitDetailedStatsNode:
     """
-    CacheDit 详细统计节点
+    CacheDit detailed statistics node
     
-    显示详细的缓存统计信息，包括多模型统计
+    Displays detailed cache statistics, including multi-model stats
     """
     
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "trigger": ("*",),  # 接受任何类型作为触发器
+                "trigger": ("*",),  # Accept any type as a trigger
             },
             "optional": {
                 "show_model_details": ("BOOLEAN", {"default": True}),
             }
         }
 
+
     RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("详细统计",)
+    RETURN_NAMES = ("Detailed statistics",)
     FUNCTION = "get_detailed_stats"
     CATEGORY = "CacheDit"
 
+
     def get_detailed_stats(self, trigger, show_model_details=True):
         """
-        获取详细的缓存统计信息
+        Get detailed cache statistics
         
         Args:
-            trigger: 触发器（任何值）
-            show_model_details: 是否显示模型详情
+            trigger: Trigger (any value)
+            show_model_details: Whether to show model details
             
         Returns:
-            tuple: (详细统计信息字符串,)
+            tuple: (detailed statistics string,)
         """
         if show_model_details:
             stats = global_cache.get_detailed_stats()
@@ -240,26 +258,28 @@ class CacheDitDetailedStatsNode:
         return (stats,)
 
 
-# 节点映射
+
+# Node mappings
 NODE_CLASS_MAPPINGS = {
-    # 原有节点（保持向后兼容）
+    # Original nodes (kept for backward compatibility)
     "CacheDitAccelerate": CacheDitAccelerateNode,
     "CacheDitStats": CacheDitStatsNode,
     
-    # 新增的增强节点
+    # New enhanced nodes
     "CacheDitConfig": CacheDitConfigNode,
     "CacheDitControl": CacheDitControlNode,
     "CacheDitDetailedStats": CacheDitDetailedStatsNode,
 }
 
-# 节点显示名称映射
+
+# Node display name mappings
 NODE_DISPLAY_NAME_MAPPINGS = {
-    # 原有节点
-    "CacheDitAccelerate": "CacheDit 模型加速",
-    "CacheDitStats": "CacheDit 统计信息",
+    # Original nodes
+    "CacheDitAccelerate": "CacheDit Model Acceleration",
+    "CacheDitStats": "CacheDit Statistics",
     
-    # 新增节点
-    "CacheDitConfig": "CacheDit 高级配置",
-    "CacheDitControl": "CacheDit 缓存控制",
-    "CacheDitDetailedStats": "CacheDit 详细统计",
+    # New nodes
+    "CacheDitConfig": "CacheDit Advanced Configuration",
+    "CacheDitControl": "CacheDit Cache Control",
+    "CacheDitDetailedStats": "CacheDit Detailed Statistics",
 }

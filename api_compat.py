@@ -1,58 +1,63 @@
 """
-CacheDiT API 兼容层
+CacheDiT API Compatibility Layer
 
-这个模块提供标准的 CacheDiT API 接口，同时保持对 ComfyUI ModelPatcher 架构的完美适配。
-支持原版 CacheDiT 的所有 API 调用方式：
+
+This module provides a standard CacheDiT API interface while maintaining perfect compatibility with the ComfyUI ModelPatcher architecture.
+It supports all API invocation methods from the original CacheDiT:
+
 
 ```python
 import cache_dit
 cache_dit.enable_cache(model, skip_interval=2, warmup_steps=3)
-cache_dit.disable_cache(model) 
+cache_dit.disable_cache(model)
 cache_dit.summary(model)
 ```
 
-内部使用增强版的缓存引擎，提供更灵活的配置选项和详细的性能统计。
+
+Internally it uses an enhanced caching engine, offering more flexible configuration options and detailed performance statistics.
 """
+
 
 from .cache_engine import global_cache, CacheStrategy
 from typing import Optional, Dict, Any, Union
 import warnings
 
 
+
 def enable_cache(model, **cache_options) -> None:
     """
-    为模型启用 CacheDiT 缓存加速
+    Enable CacheDiT cache acceleration for a model
     
-    这是标准的 CacheDiT API 入口点，与原版 API 完全兼容。
-    支持多种缓存策略和配置选项。
+    This is the standard CacheDiT API entry point and is fully compatible with the original API.
+    It supports multiple caching strategies and configuration options.
     
     Args:
-        model: 模型对象（支持 ComfyUI ModelPatcher 和其他模型类型）
-        **cache_options: 缓存配置选项
-            - skip_interval (int): 跳步间隔，默认为 2（每隔一步跳过）
-            - warmup_steps (int): 预热步数，默认为 3
-            - strategy (str): 缓存策略，可选 'fixed', 'dynamic', 'adaptive'
-            - noise_scale (float): 噪声缩放因子，默认 0.001
-            - enable_stats (bool): 是否启用详细统计，默认 True
-            - debug (bool): 是否启用调试输出，默认 False
+        model: Model object (supports ComfyUI ModelPatcher and other model types)
+        **cache_options: Cache configuration options
+            - skip_interval (int): Step-skipping interval, default is 2 (skip every other step)
+            - warmup_steps (int): Number of warmup steps, default is 3
+            - strategy (str): Cache strategy, one of 'fixed', 'dynamic', 'adaptive'
+            - noise_scale (float): Noise scaling factor, default is 0.001
+            - enable_stats (bool): Whether to enable detailed statistics, default is True
+            - debug (bool): Whether to enable debug output, default is False
     
     Example:
         ```python
         import cache_dit
         
-        # 基础用法
+        # Basic usage
         cache_dit.enable_cache(model)
         
-        # 自定义配置
+        # Custom configuration
         cache_dit.enable_cache(model, 
                               skip_interval=3, 
                               warmup_steps=5,
                               strategy='adaptive')
         ```
     """
-    print(f"\n🚀 启用 CacheDiT 加速 (API 兼容模式)")
+    print(f"\n🚀 Enable CacheDiT acceleration (API compatibility mode)")
     
-    # 设置默认配置
+    # Set default configuration
     default_options = {
         'skip_interval': 2,
         'warmup_steps': 3,
@@ -62,10 +67,10 @@ def enable_cache(model, **cache_options) -> None:
         'debug': False
     }
     
-    # 合并用户配置
+    # Merge user configuration
     config = {**default_options, **cache_options}
     
-    # 创建缓存策略
+    # Create cache strategy
     strategy = CacheStrategy(
         skip_interval=config['skip_interval'],
         warmup_steps=config['warmup_steps'],
@@ -75,89 +80,92 @@ def enable_cache(model, **cache_options) -> None:
         debug=config['debug']
     )
     
-    print(f"   配置: {config}")
+    print(f"   Configuration: {config}")
     
-    # 应用缓存到模型
+    # Apply caching to the model
     global_cache.enable_cache(model, strategy)
     
-    print("✓ CacheDiT 缓存已启用")
+    print("✓ CacheDiT cache enabled")
+
 
 
 def disable_cache(model) -> None:
     """
-    为模型禁用 CacheDiT 缓存
+    Disable CacheDiT caching for a model
     
-    恢复模型的原始行为，移除所有缓存相关的修改。
-    这是标准的 CacheDiT API 接口。
+    Restore the model's original behavior and remove all cache-related modifications.
+    This is the standard CacheDiT API interface.
     
     Args:
-        model: 之前应用了缓存的模型对象
+        model: The model object that previously had caching applied
         
     Example:
         ```python
         import cache_dit
         
-        # 禁用缓存
+        # Disable cache
         cache_dit.disable_cache(model)
         ```
     """
-    print(f"\n🛑 禁用 CacheDiT 缓存 (API 兼容模式)")
+    print(f"\n🛑 Disable CacheDiT cache (API compatibility mode)")
     
-    # 通过全局缓存管理器禁用缓存
+    # Disable cache via the global cache manager
     global_cache.disable_cache(model)
     
-    print("✓ CacheDiT 缓存已禁用")
+    print("✓ CacheDiT cache disabled")
+
 
 
 def summary(model) -> str:
     """
-    获取模型的缓存统计摘要
+    Get a cache statistics summary for the model
     
-    返回详细的缓存性能统计信息，包括命中率、加速比等。
-    这是标准的 CacheDiT API 接口。
+    Returns detailed cache performance statistics, including hit rate, speedup ratio, etc.
+    This is the standard CacheDiT API interface.
     
     Args:
-        model: 模型对象
+        model: Model object
         
     Returns:
-        str: 格式化的统计信息字符串
+        str: Formatted statistics string
         
     Example:
         ```python
         import cache_dit
         
-        # 获取统计信息
+        # Get statistics
         stats = cache_dit.summary(model)
         print(stats)
         ```
     """
-    print(f"\n📊 获取 CacheDiT 统计摘要 (API 兼容模式)")
+    print(f"\n📊 Get CacheDiT statistics summary (API compatibility mode)")
     
-    # 获取全局统计信息
+    # Get global statistics
     stats = global_cache.get_detailed_stats()
     
     return stats
 
 
+
 def set_global_config(**config) -> None:
     """
-    设置全局缓存配置
+    Set global cache configuration
     
-    影响后续所有 enable_cache 调用的默认行为。
-    这是扩展的 API，提供更灵活的全局配置管理。
+    Affects the default behavior of all subsequent enable_cache calls.
+    This is an extended API that provides more flexible global configuration management.
     
     Args:
-        **config: 全局配置选项
-            - default_skip_interval (int): 默认跳步间隔
-            - default_warmup_steps (int): 默认预热步数
-            - default_strategy (str): 默认缓存策略
-            - global_debug (bool): 全局调试模式
+        **config: Global configuration options
+            - default_skip_interval (int): Default step-skipping interval
+            - default_warmup_steps (int): Default number of warmup steps
+            - default_strategy (str): Default cache strategy
+            - global_debug (bool): Global debug mode
             
     Example:
         ```python
         import cache_dit
         
-        # 设置全局配置
+        # Set global configuration
         cache_dit.set_global_config(
             default_skip_interval=3,
             default_strategy='adaptive',
@@ -165,68 +173,73 @@ def set_global_config(**config) -> None:
         )
         ```
     """
-    print(f"\n⚙️ 设置 CacheDiT 全局配置")
-    print(f"   配置项: {config}")
+    print(f"\n⚙️ Set CacheDiT global configuration")
+    print(f"   Options: {config}")
     
     global_cache.set_global_config(config)
     
-    print("✓ 全局配置已更新")
+    print("✓ Global configuration updated")
+
 
 
 def get_global_stats() -> Dict[str, Any]:
     """
-    获取全局缓存统计信息
+    Get global cache statistics
     
-    返回包含所有模型缓存统计的详细信息字典。
-    这是扩展的 API，用于高级监控和调试。
+    Returns a detailed dictionary containing cache statistics for all models.
+    This is an extended API for advanced monitoring and debugging.
     
     Returns:
-        Dict[str, Any]: 包含详细统计信息的字典
+        Dict[str, Any]: Dictionary containing detailed statistics
         
     Example:
         ```python
         import cache_dit
         
-        # 获取全局统计
+        # Get global statistics
         stats = cache_dit.get_global_stats()
-        print(f"总缓存命中: {stats['total_cache_hits']}")
+        print(f"Total cache hits: {stats['total_cache_hits']}")
         ```
     """
     return global_cache.get_global_stats()
 
 
+
 def reset_cache_stats() -> None:
     """
-    重置所有缓存统计信息
+    Reset all cache statistics
     
-    清零所有计数器和性能指标，用于重新开始统计。
-    这是扩展的 API，用于调试和测试。
+    Clears all counters and performance metrics to restart statistics collection.
+    This is an extended API for debugging and testing.
     
     Example:
         ```python
         import cache_dit
         
-        # 重置统计
+        # Reset statistics
         cache_dit.reset_cache_stats()
         ```
     """
-    print(f"\n🔄 重置 CacheDiT 统计信息")
+    print(f"\n🔄 Reset CacheDiT statistics")
     
     global_cache.reset_stats()
     
-    print("✓ 统计信息已重置")
+    print("✓ Statistics reset")
 
 
-# 兼容性别名 - 支持不同的导入方式
+
+# Compatibility aliases - support different import styles
 enable = enable_cache
 disable = disable_cache
 stats = summary
 
-# 版本信息
+
+# Version information
 __version__ = "1.0.0"
 __api_version__ = "compatible"
 
-# 导出的公共接口
+
+# Exported public interface
 __all__ = [
     'enable_cache',
     'disable_cache', 
@@ -234,7 +247,7 @@ __all__ = [
     'set_global_config',
     'get_global_stats',
     'reset_cache_stats',
-    # 别名
+    # Aliases
     'enable',
     'disable',
     'stats'
