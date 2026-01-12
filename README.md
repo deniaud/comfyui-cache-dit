@@ -1,7 +1,3 @@
-Here is the English translation, keeping the original Markdown formatting and structure intact.
-
-***
-
 # ComfyUI CacheDit Plugin
 
 This is a powerful plugin providing diffusion model inference acceleration for **ComfyUI**, **fully compatible with the standard CacheDiT API**, while offering rich ComfyUI node support.
@@ -205,3 +201,4 @@ Open source project, issues and PRs welcome.
 ***
 
 Would you like me to create a Python script example demonstrating how to integrate this `cache_dit` API into a standard Diffusers pipeline?
+
